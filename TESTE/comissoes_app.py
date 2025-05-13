@@ -24,7 +24,7 @@ if vendas_file and extratos_file:
     extratos.columns = extratos.columns.str.strip()
 
     # Corrige tipos de dados
-    extratos["Data Fechamento"] = pd.to_datetime(vendas["Data Fechamento"])
+    extratos["Data Fechamento"] = pd.to_datetime(extratos["Data Fechamento"])
     vendas["Mês/Ano"] = vendas["Data Fechamento"].dt.strftime("%m/%Y")
 
     # Filtra pelo mês selecionado
