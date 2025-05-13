@@ -29,8 +29,16 @@ if vendas_file and extratos_file:
     # Filtra o extrato pelo mês selecionado
     extratos_mes = extratos[extratos["Mês/Ano"] == mes_ano].copy()
 
-    # Garante que a coluna CONTRATO é string
+   # Verifica se a coluna 'CONTRATO' existe nas duas planilhas
+if "CONTRATO" in vendas.columns and "CONTRATO" in extratos_mes.columns:
+    extratos_mes = extratos_mes.copy()
     extratos_mes["CONTRATO"] = extratos_mes["CONTRATO"].astype(str)
+    contratos_validos = vendas["CONTRATO"].astype(str).unique()
+    extratos_mes = extratos_mes[extratos_mes["CONTRATO"].isin(contratos_validos)]
+else:
+    st.error("A coluna 'CONTRATO' não foi encontrada em uma das planilhas. Verifique os nomes das colunas.")
+    st.stop()
+
 
     # Filtra apenas contratos que estão na planilha de vendas (se existir a coluna "CONTRATO")
     if "CONTRATO" in vendas.columns and "CONTRATO" in extratos_mes.columns:
