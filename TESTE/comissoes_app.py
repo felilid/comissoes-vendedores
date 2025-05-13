@@ -55,17 +55,17 @@ if vendas_file and extratos_file:
         st.subheader(f"📌 Resumo de Comissões para {mes_ano}")
         st.dataframe(resumo, use_container_width=True)
 
-        # Exporta como Excel (.xls)
+        # Exporta como Excel (.xls) usando openpyxl
         output = BytesIO()
-        with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        with pd.ExcelWriter(output, engine='openpyxl') as writer:
             resumo.to_excel(writer, index=False, sheet_name="Comissoes")
         output.seek(0)
 
         st.download_button(
             label="📥 Baixar Resumo em XLS",
             data=output,
-            file_name="comissoes.xls",
-            mime="application/vnd.ms-excel"
+            file_name="comissoes.xlsx",  # Renomeei para ".xlsx"
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         )
 else:
     st.warning("📎 Envie as duas planilhas e selecione um mês.")
