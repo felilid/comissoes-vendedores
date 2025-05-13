@@ -18,62 +18,58 @@ if vendas_file and extratos_file:
     vendas = pd.read_excel(vendas_file)
     extratos = pd.read_excel(extratos_file)
 
-    # Remove espaços extras dos nomes das colunas
-    vendas.columns = vendas.columns.str.strip()
-    extratos.columns = extratos.columns.str.strip()
+    # Padroniza nomes de colunas (tira espaços e deixa maiúsculo)
+    vendas.columns = vendas.columns.str.strip().str.upper()
+    extratos.columns = extratos.columns.str.strip().str.upper()
 
-    # Verifica se 'Data Fechamento' existe no extrato
-    if "Data Fechamento" not in extratos.columns:
-        st.error("❌ A planilha EXTRATOS deve conter a coluna 'Data Fechamento'.")
-        st.stop()
+    # Exibe os nomes das colunas carregadas (para debug)
+    st.write("🧾 Colunas em VENDAS:", vendas.columns.tolist())
+    st.write("🧾 Colunas em EXTRATOS:", extratos.columns.tolist())
 
-    # Converte datas e cria coluna de Mês/Ano
-    extratos["Data Fechamento"] = pd.to_datetime(extratos["Data Fechamento"])
-    extratos["Mês/Ano"] = extratos["Data Fechamento"].dt.strftime("%m/%Y")
+    # Verifica se a coluna 'CONTRATO' existe nas duas
+    if 'CONTRATO' in vendas.columns and 'CONTRATO' in extratos.columns:
 
-    # Verifica se a coluna 'CONTRATO' existe nas duas planilhas
-    if "CONTRATO" not in vendas.columns or "CONTRATO" not in extratos.columns:
-        st.error("❌ A coluna 'CONTRATO' deve existir nas duas planilhas.")
-        st.stop()
-
-    # Converte para string antes de comparar
-    extratos["CONTRATO"] = extratos["CONTRATO"].astype(str)
-    vendas["CONTRATO"] = vendas["CONTRATO"].astype(str)
-
-    # Filtra extratos do mês
-    extratos_mes = extratos[extratos["Mês/Ano"] == mes_ano].copy()
-
-    # Filtra apenas os contratos que estão na planilha de vendas
-    extratos_validos = extratos_mes[extratos_mes["CONTRATO"].isin(vendas["CONTRATO"])]
-
-    # Verifica se colunas necessárias para cálculo existem
-    colunas_necessarias = ["Vlr Vendido", "% COMISSÃO", "Quantidade de Parcelas", "Vendedor"]
-    for coluna in colunas_necessarias:
-        if coluna not in extratos_validos.columns:
-            st.error(f"❌ A coluna '{coluna}' está faltando na planilha EXTRATOS.")
+        # Corrige tipos de dados
+        if 'DATA FECHAMENTO' in extratos.columns:
+            extratos["DATA FECHAMENTO"] = pd.to_datetime(extratos["DATA FECHAMENTO"])
+            extratos["MÊS/ANO"] = extratos["DATA FECHAMENTO"].dt.strftime("%m/%Y")
+        else:
+            st.error("❌ A planilha EXTRATOS precisa ter a coluna 'Data Fechamento'")
             st.stop()
 
-    # Cálculo da comissão total
-    extratos_validos["Valor Comissão Total"] = (
-        extratos_validos["Vlr Vendido"] * (extratos_validos["% COMISSÃO"] / 100)
-    )
+        # Filtra pelo mês selecionado
+        extratos_mes = extratos[extratos["MÊS/ANO"] == mes_ano]
 
-    # Comissão por parcela
-    extratos_validos["Valor Comissão Parcela"] = (
-        extratos_validos["Valor Comissão Total"] / extratos_validos["Quantidade de Parcelas"]
-    )
+        # Contratos pagos no extrato
+        contratos_recebidos = extratos["CONTRATO"].astype(str).unique()
+        extratos_mes["CONTRATO"] = extratos_mes["CONTRATO"].astype(str)
+        extratos_validos = extratos_mes[extratos_mes["CONTRATO"].isin(contratos_recebidos)]
 
-    # Agrupamento por vendedor
-    resumo = extratos_validos.groupby("Vendedor")["Valor Comissão Parcela"].sum().reset_index()
-    resumo.columns = ["Vendedor", "Comissão do Mês (R$)"]
-    resumo["Comissão do Mês (R$)"] = resumo["Comissão do Mês (R$)"].round(2)
+        # Calcula a comissão
+        extratos_validos["VALOR COMISSÃO TOTAL"] = (
+            extratos_validos["VLR VENDIDO"] *
+            (extratos_validos["% COMISSÃO"] / 100)
+        )
 
-    # Exibe os resultados
-    st.subheader(f"📌 Resumo de Comissões para {mes_ano}")
-    st.dataframe(resumo, use_container_width=True)
+        # Divide conforme quantidade de parcelas
+        extratos_validos["VALOR COMISSÃO PARCELA"] = (
+            extratos_validos["VALOR COMISSÃO TOTAL"] / extratos_validos["QUANTIDADE DE PARCELAS"]
+        )
 
-    # Botão para download
-    csv = resumo.to_csv(index=False).encode("utf-8")
-    st.download_button("📥 Baixar Resumo em CSV", csv, "comissoes.csv", "text/csv")
+        # Agrupa por vendedor
+        resumo = extratos_validos.groupby("VENDEDOR")["VALOR COMISSÃO PARCELA"].sum().reset_index()
+        resumo.columns = ["Vendedor", "Comissão do Mês (R$)"]
+        resumo["Comissão do Mês (R$)"] = resumo["Comissão do Mês (R$)"].round(2)
+
+        # Exibe os resultados
+        st.subheader(f"📌 Resumo de Comissões para {mes_ano}")
+        st.dataframe(resumo, use_container_width=True)
+
+        # Botão para baixar em CSV
+        csv = resumo.to_csv(index=False).encode("utf-8")
+        st.download_button("📥 Baixar Resumo em CSV", csv, "comissoes.csv", "text/csv")
+
+    else:
+        st.error("❌ A coluna 'CONTRATO' deve existir **nas duas planilhas**.")
 else:
-    st.warning("⚠️ Envie as duas planilhas e selecione um mês.")
+    st.warning("📤 Envie as duas planilhas e selecione um mês.")
