@@ -18,55 +18,62 @@ if vendas_file and extratos_file:
     vendas = pd.read_excel(vendas_file)
     extratos = pd.read_excel(extratos_file)
 
-    # Padroniza os nomes das colunas (remove espaços extras)
+    # Remove espaços extras dos nomes das colunas
     vendas.columns = vendas.columns.str.strip()
     extratos.columns = extratos.columns.str.strip()
 
-    # Converte datas
+    # Verifica se 'Data Fechamento' existe no extrato
+    if "Data Fechamento" not in extratos.columns:
+        st.error("❌ A planilha EXTRATOS deve conter a coluna 'Data Fechamento'.")
+        st.stop()
+
+    # Converte datas e cria coluna de Mês/Ano
     extratos["Data Fechamento"] = pd.to_datetime(extratos["Data Fechamento"])
     extratos["Mês/Ano"] = extratos["Data Fechamento"].dt.strftime("%m/%Y")
 
-    # Filtra o extrato pelo mês selecionado
+    # Verifica se a coluna 'CONTRATO' existe nas duas planilhas
+    if "CONTRATO" not in vendas.columns or "CONTRATO" not in extratos.columns:
+        st.error("❌ A coluna 'CONTRATO' deve existir nas duas planilhas.")
+        st.stop()
+
+    # Converte para string antes de comparar
+    extratos["CONTRATO"] = extratos["CONTRATO"].astype(str)
+    vendas["CONTRATO"] = vendas["CONTRATO"].astype(str)
+
+    # Filtra extratos do mês
     extratos_mes = extratos[extratos["Mês/Ano"] == mes_ano].copy()
 
-   # Verifica se a coluna 'CONTRATO' existe nas duas planilhas
-if "CONTRATO" in vendas.columns and "CONTRATO" in extratos_mes.columns:
-    extratos_mes = extratos_mes.copy()
-    extratos_mes["CONTRATO"] = extratos_mes["CONTRATO"].astype(str)
-    contratos_validos = vendas["CONTRATO"].astype(str).unique()
-    extratos_mes = extratos_mes[extratos_mes["CONTRATO"].isin(contratos_validos)]
-else:
-    st.error("A coluna 'CONTRATO' não foi encontrada em uma das planilhas. Verifique os nomes das colunas.")
-    st.stop()
+    # Filtra apenas os contratos que estão na planilha de vendas
+    extratos_validos = extratos_mes[extratos_mes["CONTRATO"].isin(vendas["CONTRATO"])]
 
-
-    # Filtra apenas contratos que estão na planilha de vendas (se existir a coluna "CONTRATO")
-    if "CONTRATO" in vendas.columns and "CONTRATO" in extratos_mes.columns:
-        contratos_validos = vendas["CONTRATO"].astype(str).unique()
-        extratos_mes = extratos_mes[extratos_mes["CONTRATO"].isin(contratos_validos)]
+    # Verifica se colunas necessárias para cálculo existem
+    colunas_necessarias = ["Vlr Vendido", "% COMISSÃO", "Quantidade de Parcelas", "Vendedor"]
+    for coluna in colunas_necessarias:
+        if coluna not in extratos_validos.columns:
+            st.error(f"❌ A coluna '{coluna}' está faltando na planilha EXTRATOS.")
+            st.stop()
 
     # Cálculo da comissão total
-    extratos_mes["Valor Comissão Total"] = (
-        extratos_mes["Vlr Vendido"] * (extratos_mes["% COMISSÃO"] / 100)
+    extratos_validos["Valor Comissão Total"] = (
+        extratos_validos["Vlr Vendido"] * (extratos_validos["% COMISSÃO"] / 100)
     )
 
-    # Comissão proporcional por parcela
-    extratos_mes["Valor Comissão Parcela"] = (
-        extratos_mes["Valor Comissão Total"] / extratos_mes["Quantidade de Parcelas"]
+    # Comissão por parcela
+    extratos_validos["Valor Comissão Parcela"] = (
+        extratos_validos["Valor Comissão Total"] / extratos_validos["Quantidade de Parcelas"]
     )
 
     # Agrupamento por vendedor
-    resumo = extratos_mes.groupby("Vendedor")["Valor Comissão Parcela"].sum().reset_index()
+    resumo = extratos_validos.groupby("Vendedor")["Valor Comissão Parcela"].sum().reset_index()
     resumo.columns = ["Vendedor", "Comissão do Mês (R$)"]
     resumo["Comissão do Mês (R$)"] = resumo["Comissão do Mês (R$)"].round(2)
 
-    # Exibição do resultado
+    # Exibe os resultados
     st.subheader(f"📌 Resumo de Comissões para {mes_ano}")
     st.dataframe(resumo, use_container_width=True)
 
-    # Download em CSV
+    # Botão para download
     csv = resumo.to_csv(index=False).encode("utf-8")
     st.download_button("📥 Baixar Resumo em CSV", csv, "comissoes.csv", "text/csv")
-
 else:
-    st.warning("Envie as duas planilhas e selecione um mês.")
+    st.warning("⚠️ Envie as duas planilhas e selecione um mês.")
