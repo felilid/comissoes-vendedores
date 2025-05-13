@@ -28,26 +28,26 @@ if vendas_file and extratos_file:
     extratos["Mês/Ano"] = extratos["Data Fechamento"].dt.strftime("%m/%Y")
 
     # Filtra pelo mês selecionado
-    extratos_mes = extratos[vendas["Mês/Ano"] == mes_ano]
+    extratos_mes = extratos[extratos["Mês/Ano"] == mes_ano]
 
     # Contratos pagos no extrato
     contratos_recebidos = extratos["CONTRATO"].astype(str).unique()
-    vendas_mes["CONTRATO"] = vendas_mes["CONTRATO"].astype(str)
-    vendas_validas = vendas_mes[vendas_mes["CONTRATO"].isin(contratos_recebidos)]
+    extratos_mes["CONTRATO"] = extratos_mes["CONTRATO"].astype(str)
+    extratos_validos = extratos_mes[extratos_mes["CONTRATO"].isin(contratos_recebidos)]
 
     # Calcula a comissão
-    vendas_validas["Valor Comissão Total"] = (
-        vendas_validas["Vlr Vendido"] *
-        (vendas_validas["% COMISSÃO"] / 100)
+    extratos_validos["Valor Comissão Total"] = (
+        extratos_validos["Vlr Vendido"] *
+        (extratos_validos["% COMISSÃO"] / 100)
     )
 
     # Divide conforme quantidade de parcelas
-    vendas_validas["Valor Comissão Parcela"] = (
-        vendas_validas["Valor Comissão Total"] / vendas_validas["Quantidade de Parcelas"]
+    extratos_validos["Valor Comissão Parcela"] = (
+        extratos_validos["Valor Comissão Total"] / extratos_validos["Quantidade de Parcelas"]
     )
 
     # Agrupa por vendedor
-    resumo = vendas_validas.groupby("Vendedor")["Valor Comissão Parcela"].sum().reset_index()
+    resumo = extratos_validos.groupby("Vendedor")["Valor Comissão Parcela"].sum().reset_index()
     resumo.columns = ["Vendedor", "Comissão do Mês (R$)"]
     resumo["Comissão do Mês (R$)"] = resumo["Comissão do Mês (R$)"].round(2)
 
