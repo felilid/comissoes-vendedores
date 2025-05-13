@@ -1,5 +1,6 @@
 import pandas as pd
 import streamlit as st
+from io import BytesIO
 
 st.set_page_config(page_title="Cálculo de Comissões", layout="wide")
 st.title("🔍 Cálculo de Comissões dos Vendedores")
@@ -13,19 +14,16 @@ mes_ano = st.selectbox("📅 Selecione o mês/ano de pagamento:", [
     "01/2025", "02/2025", "03/2025", "04/2025", "05/2025"
 ])
 
-# Linha de cabeçalho (ajuste aqui se necessário)
-linha_cabecalho_vendas = 0  # Ex: se começa na linha 3, coloque 2
+# Linha de cabeçalho da planilha VENDAS
+linha_cabecalho_vendas = 0  # Ajuste aqui se necessário
 
 if vendas_file and extratos_file:
-    # Lê os dados
     vendas = pd.read_excel(vendas_file, skiprows=linha_cabecalho_vendas)
     extratos = pd.read_excel(extratos_file)
 
-    # Padroniza colunas
     vendas.columns = vendas.columns.str.strip().str.upper()
     extratos.columns = extratos.columns.str.strip().str.upper()
 
-    # Verifica colunas obrigatórias
     colunas_necessarias = ["CONTRATO", "VALOR BASE", "DATA FECHAMENTO", "% DE COMISSÃO"]
     for col in ["CONTRATO"]:
         if col not in vendas.columns or col not in extratos.columns:
@@ -36,12 +34,10 @@ if vendas_file and extratos_file:
             st.error(f"❌ A coluna '{col}' está faltando em ambas as planilhas.")
             st.stop()
 
-    # Processa datas e filtra mês
     extratos["DATA FECHAMENTO"] = pd.to_datetime(extratos["DATA FECHAMENTO"])
     extratos["MÊS/ANO"] = extratos["DATA FECHAMENTO"].dt.strftime("%m/%Y")
     extratos_mes = extratos[extratos["MÊS/ANO"] == mes_ano].copy()
 
-    # Converte campos e junta % de comissão da planilha VENDAS
     extratos_mes["CONTRATO"] = extratos_mes["CONTRATO"].astype(str)
     vendas["CONTRATO"] = vendas["CONTRATO"].astype(str)
 
@@ -51,7 +47,6 @@ if vendas_file and extratos_file:
         how="left"
     )
 
-    # Cálculo da comissão
     extratos_validos["VALOR COMISSÃO TOTAL"] = (
         extratos_validos["VALOR BASE"] * (extratos_validos["% DE COMISSÃO"] / 100)
     )
@@ -59,15 +54,24 @@ if vendas_file and extratos_file:
         extratos_validos["VALOR COMISSÃO TOTAL"] / extratos_validos["QUANTIDADE DE PARCELAS"]
     )
 
-    # Agrupamento por vendedor
     resumo = extratos_validos.groupby("VENDEDOR")["VALOR COMISSÃO PARCELA"].sum().reset_index()
     resumo.columns = ["Vendedor", "Comissão do Mês (R$)"]
     resumo["Comissão do Mês (R$)"] = resumo["Comissão do Mês (R$)"].round(2)
 
-    # Exibe e exporta
     st.subheader(f"📌 Resumo de Comissões para {mes_ano}")
     st.dataframe(resumo, use_container_width=True)
-    csv = resumo.to_csv(index=False).encode("utf-8")
-    st.download_button("📥 Baixar Resumo em CSV", csv, "comissoes.csv", "text/csv")
+
+    # Cria arquivo Excel em memória
+    output = BytesIO()
+    with pd.ExcelWriter(output, engine='xlsxwriter') as writer:
+        resumo.to_excel(writer, sheet_name="Comissões", index=False)
+    output.seek(0)
+
+    st.download_button(
+        label="📥 Baixar Resumo em Excel (.xlsx)",
+        data=output,
+        file_name="comissoes.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    )
 else:
     st.warning("Envie as duas planilhas e selecione um mês.")
