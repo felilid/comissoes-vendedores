@@ -25,10 +25,10 @@ if vendas_file and extratos_file:
 
     # Corrige tipos de dados
     extratos["Data Fechamento"] = pd.to_datetime(extratos["Data Fechamento"])
-    vendas["Mês/Ano"] = vendas["Data Fechamento"].dt.strftime("%m/%Y")
+    extratos["Mês/Ano"] = extratos["Data Fechamento"].dt.strftime("%m/%Y")
 
     # Filtra pelo mês selecionado
-    vendas_mes = vendas[vendas["Mês/Ano"] == mes_ano]
+    extratos_mes = extratos[vendas["Mês/Ano"] == mes_ano]
 
     # Contratos pagos no extrato
     contratos_recebidos = extratos["CONTRATO"].astype(str).unique()
