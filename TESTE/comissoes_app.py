@@ -21,11 +21,19 @@ if extratos_file:
         extratos["DATA FECHAMENTO"] = pd.to_datetime(extratos["DATA FECHAMENTO"], errors="coerce")
         extratos = extratos.dropna(subset=["DATA FECHAMENTO"])
         extratos["MÊS/ANO"] = extratos["DATA FECHAMENTO"].dt.strftime("%m/%Y")
-        meses_disponiveis = sorted(extratos["MÊS/ANO"].unique())
+        extratos["ANO_MES"] = extratos["DATA FECHAMENTO"].dt.to_period("M")
+        
+        # Ordenação cronológica correta dos meses
+        meses_disponiveis = (
+            extratos.drop_duplicates("ANO_MES")
+            .sort_values("ANO_MES")
+            ["MÊS/ANO"]
+            .tolist()
+        )
     except Exception as e:
         st.error(f"Erro ao ler a planilha EXTRATOS: {e}")
 
-# Seleção dinâmica do mês
+# Seleção do mês (dinâmico e ordenado)
 mes_ano = st.selectbox("📅 Selecione o mês/ano de pagamento:", meses_disponiveis)
 
 if vendas_file and extratos_file and mes_ano:
@@ -86,3 +94,4 @@ if vendas_file and extratos_file and mes_ano:
             )
 else:
     st.warning("📎 Envie as duas planilhas e selecione um mês.")
+
